@@ -287,20 +287,9 @@ class ClientQueryViewController: UITableViewController, Themeable {
 				}
 
 				self.deleteConfirmationActionSheet(title: item.name, message: message, completion: {
-					let hudController = ProgressHUDViewController()
-//					OnMainThread {
-//						hudController.present(on: self, label: "Deleting...".localized)
-//					}
 					_ = self.core?.delete(item, requireMatch: true, resultHandler: { (error, _, _, _) in
-//						OnMainThread {
-//							hudController.dismiss()
-//						}
 						if error != nil {
-							let errorAlert = UIAlertController(title: "Something wrong happened".localized, message: error?.localizedDescription, preferredStyle: .alert)
-							errorAlert.addAction(UIAlertAction(title: "Ok".localized, style: .default))
-//							OnMainThread {
-//									self.present(errorAlert, animated: true)
-//							}
+							Log.log("Error \(String(describing: error)) deleting \(String(describing: item.path))")
 						}
 					})
 				})
@@ -634,6 +623,9 @@ extension ClientQueryViewController : ActionsToolBarDelegate {
 					})
 				}
 			}
+			self.tableView.setEditing(false, animated: true)
+			self.actionsToolBar?.hide()
+
 		}
 	}
 }

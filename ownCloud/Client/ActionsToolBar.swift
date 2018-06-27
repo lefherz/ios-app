@@ -161,6 +161,7 @@ class ActionsToolBar: UIToolbar, Themeable {
 	}
 
 	func hide() {
+		self.disableAll()
 		OnMainThread {
 			UIView.animate(withDuration: 0.3, animations: {
 				self.alpha = 0
