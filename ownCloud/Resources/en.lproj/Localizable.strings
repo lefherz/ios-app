@@ -77,6 +77,13 @@
 "Folder removed" = "Folder removed";
 "This folder no longer exists on the server." = "This folder no longer exists on the server.";
 
+/* Client Edit Messages */
+"Are you sure you want to delete this folder from the server?" = "Are you sure you want to delete this folder from the server?";
+"Are you sure you want to delete this file from the server?" = "Are you sure you want to delete this file from the server?";
+"Deleting..." = "Deleting...";
+"Something wrong happened" = "Something wrong happened";
+"Ok" = "Ok";
+
 /* Server List*/
 "Cancel" = "Cancel";
 "OK" = "OK";

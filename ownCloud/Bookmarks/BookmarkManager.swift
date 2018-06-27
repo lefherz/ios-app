@@ -38,7 +38,7 @@ class BookmarkManager: NSObject {
 
 	// MARK: - Storage Location
 	func bookmarkStoreURL() -> URL {
-		return OCAppIdentity.shared().appGroupContainerURL.appendingPathComponent("bookmarks.dat")
+		return OCAppIdentity.shared.appGroupContainerURL.appendingPathComponent("bookmarks.dat")
 	}
 
 	// MARK: - Loading and Saving

@@ -104,12 +104,13 @@ class ClientQueryViewController: UITableViewController, Themeable {
 		super.viewDidLoad()
 
 		self.tableView.register(ClientItemCell.self, forCellReuseIdentifier: "itemCell")
+		self.tableView.allowsMultipleSelectionDuringEditing = true
 
 		// Uncomment the following line to preserve selection between presentations
 		// self.clearsSelectionOnViewWillAppear = false
 
 		// Uncomment the following line to display an Edit button in the navigation bar for this view controller.
-		// self.navigationItem.rightBarButtonItem = self.editButtonItem
+		 self.navigationItem.rightBarButtonItem = self.editButtonItem
 
 		searchController = UISearchController(searchResultsController: nil)
 		searchController?.searchResultsUpdater = self
@@ -135,6 +136,9 @@ class ClientQueryViewController: UITableViewController, Themeable {
 		tableView.contentOffset = CGPoint(x: 0, y: searchController!.searchBar.frame.height)
 
 		Theme.shared.register(client: self, applyImmediately: true)
+
+		createActionsToolBar()
+
 	}
 
 	override func viewWillDisappear(_ animated: Bool) {
@@ -248,7 +252,7 @@ class ClientQueryViewController: UITableViewController, Themeable {
 
 		// UITableView can call this method several times for the same cell, and .dequeueReusableCell will then return the same cell again.
 		// Make sure we don't request the thumbnail multiple times in that case.
-		if (cell?.item?.versionIdentifier != newItem.versionIdentifier) || (cell?.item?.name != newItem.name) {
+		if (cell?.item?.itemVersionIdentifier != newItem.itemVersionIdentifier) || (cell?.item?.name != newItem.name) {
 			cell?.item = newItem
 		}
 
@@ -256,11 +260,53 @@ class ClientQueryViewController: UITableViewController, Themeable {
 	}
 
 	override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-		let rowItem : OCItem = self.items![indexPath.row]
+		if tableView.isEditing {
+			updateActionsToolBar()
+		} else {
+			let rowItem : OCItem = self.items![indexPath.row]
 
-		if rowItem.type == .collection {
-			self.navigationController?.pushViewController(ClientQueryViewController(core: self.core!, query: OCQuery(forPath: rowItem.path)), animated: true)
+			if rowItem.type == .collection {
+				self.navigationController?.pushViewController(ClientQueryViewController(core: self.core!, query: OCQuery(forPath: rowItem.path)), animated: true)
+			}
 		}
+	}
+
+	override func tableView(_ tableView: UITableView, didDeselectRowAt indexPath: IndexPath) {
+		updateActionsToolBar()
+	}
+
+	override func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+		return UISwipeActionsConfiguration(actions: [
+			UIContextualAction(style: .destructive, title: "Delete".localized, handler: { (_, _, actionPerformed) in
+				let item = self.items![indexPath.row]
+
+				var message = "Are you sure you want to delete this file from the server?".localized
+
+				if item.type == .collection {
+					message = "Are you sure you want to delete this folder from the server?".localized
+				}
+
+				self.deleteConfirmationActionSheet(title: item.name, message: message, completion: {
+					let hudController = ProgressHUDViewController()
+//					OnMainThread {
+//						hudController.present(on: self, label: "Deleting...".localized)
+//					}
+					_ = self.core?.delete(item, requireMatch: true, resultHandler: { (error, _, _, _) in
+//						OnMainThread {
+//							hudController.dismiss()
+//						}
+						if error != nil {
+							let errorAlert = UIAlertController(title: "Something wrong happened".localized, message: error?.localizedDescription, preferredStyle: .alert)
+							errorAlert.addAction(UIAlertAction(title: "Ok".localized, style: .default))
+//							OnMainThread {
+//									self.present(errorAlert, animated: true)
+//							}
+						}
+					})
+				})
+				actionPerformed(false)
+			})
+		])
 	}
 
 	// MARK: - Message
@@ -401,6 +447,73 @@ class ClientQueryViewController: UITableViewController, Themeable {
 
 	// MARK: - Search
 	var searchController: UISearchController?
+
+	// MARK: - Edit
+	private var actionsToolBar: ActionsToolBar?
+
+	private func createActionsToolBar() {
+		actionsToolBar = ActionsToolBar(frame: .zero)
+		actionsToolBar?.translatesAutoresizingMaskIntoConstraints = false
+
+		self.tabBarController?.tabBar.addSubview(actionsToolBar!)
+
+		actionsToolBar?.bottomAnchor.constraint(equalTo: self.tabBarController!.tabBar.bottomAnchor).isActive = true
+		actionsToolBar?.rightAnchor.constraint(equalTo: self.tabBarController!.tabBar.rightAnchor).isActive = true
+		actionsToolBar?.leftAnchor.constraint(equalTo: self.tabBarController!.tabBar.leftAnchor).isActive = true
+		actionsToolBar?.topAnchor.constraint(equalTo: self.tabBarController!.tabBar.topAnchor).isActive = true
+
+		actionsToolBar?.isHidden = true
+		actionsToolBar?.disableAll()
+
+		actionsToolBar?.actionsDelegate = self
+
+		editButtonItem.action = #selector(editButtonItemAction)
+
+	}
+
+	@objc private func editButtonItemAction() {
+		if tableView.isEditing {
+			tableView.setEditing(false, animated: true)
+			actionsToolBar?.disableAll()
+			actionsToolBar?.hide()
+			editButtonItem.title = "Edit".localized
+		} else {
+			tableView.setEditing(true, animated: true)
+			actionsToolBar?.show()
+			editButtonItem.title = "Cancel".localized
+		}
+	}
+
+	private func updateActionsToolBar() {
+		if let selectedRows = tableView.indexPathsForSelectedRows {
+			if selectedRows.count > 0 {
+				actionsToolBar?.enableAll()
+			} else {
+				actionsToolBar?.disableAll()
+			}
+		} else {
+			actionsToolBar?.disableAll()
+		}
+	}
+
+	private func deleteConfirmationActionSheet(title: String?, message: String?, completion: @escaping () -> Void) {
+		let confirmationController = UIAlertController(title: title, message: message, preferredStyle: .actionSheet)
+		let deleteAction = UIAlertAction(title: "Delete".localized, style: .destructive) { (_) in
+			completion()
+		}
+
+		let cancelAction = UIAlertAction(title: "Cancel".localized, style: .cancel, handler: nil)
+
+		confirmationController.addAction(deleteAction)
+		confirmationController.addAction(cancelAction)
+
+		if let popoverController = confirmationController.popoverPresentationController {
+			popoverController.sourceView = self.view
+			popoverController.sourceRect = CGRect(x: self.view.bounds.midX, y: self.view.bounds.midY, width: 0, height: 0)
+			popoverController.permittedArrowDirections = []
+		}
+		self.present(confirmationController, animated: true)
+	}
 }
 
 // MARK: - Query Delegate
@@ -491,5 +604,36 @@ extension ClientQueryViewController: UISearchResultsUpdating {
 	func sortBar(_ sortBar: SortBar, presentViewController: UIViewController, animated: Bool, completionHandler: (() -> Void)?) {
 
 		self.present(presentViewController, animated: animated, completion: completionHandler)
+	}
+}
+
+// MARK: - ActionsToolBar Delegate
+extension ClientQueryViewController : ActionsToolBarDelegate {
+
+	func actionsToolBar(_ toolbar: ActionsToolBar, copyButtonPressed: UIBarButtonItem?) {
+		print("Copy items pressed")
+	}
+
+	func actionsToolBar(_ toolbar: ActionsToolBar, shareButtonPressed: UIBarButtonItem?) {
+		print("Share items pressed")
+	}
+
+	func actionsToolBar(_ toolbar: ActionsToolBar, availableOfflineButtonPressed: UIBarButtonItem?) {
+		print("AvailableOffline items pressed")
+	}
+
+	func actionsToolBar(_ toolbar: ActionsToolBar, deleteButtonPressed: UIBarButtonItem?) {
+		if let selectedIndexPaths = self.tableView.indexPathsForSelectedRows {
+			self.deleteConfirmationActionSheet(title: "Multiple delete".localized, message: "Are you sure you want to delete the selected items from the server?".localized) {
+
+				for indexPath in selectedIndexPaths {
+					_ = self.core?.delete(self.items?[indexPath.row], requireMatch: true, resultHandler: { (error, _, _, _) in
+						if error != nil {
+							print("LOG ---> Error deleting some file \(error!)")
+						}
+					})
+				}
+			}
+		}
 	}
 }

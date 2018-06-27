@@ -175,7 +175,7 @@ extension NSObject {
 				if collection.tableRowHighlightColors.backgroundColor != nil {
 					let backgroundView = UIView()
 
-					backgroundView.backgroundColor = collection.tableRowHighlightColors.backgroundColor
+					backgroundView.backgroundColor = collection.tableRowColors.backgroundColor
 
 					cell.selectedBackgroundView = backgroundView
 				} else {
